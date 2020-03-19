@@ -9,9 +9,11 @@
 namespace Mchljams\Chicagotransit\CTA;
 
 use Mchljams\Chicagotransit\Http\Controller;
+use Mchljams\Chicagotransit\Http\Results;
 use Mchljams\Chicagotransit\Helpers\TimeStampResolution;
 use Mchljams\Chicagotransit\Helpers\TopParameter;
 use Mchljams\Chicagotransit\Exceptions\StopIdMissingException;
+use Mchljams\Chicagotransit\Exceptions\EntityUndefinedException;
 
 /**
  * Controller for the CTA Bus Tracker
@@ -23,7 +25,11 @@ use Mchljams\Chicagotransit\Exceptions\StopIdMissingException;
  */
 class BusTracker extends Controller
 {
+    const ENTITIES_NAMESPACE = 'Mchljams\\Chicagotransit\\Entities\\BusTracker\\';
+
     protected $baseUri = 'http://www.ctabustracker.com/bustime/api/v2/';
+
+    protected $outputTypeKey = 'format';
 
     /**
      * Use the time request to retrieve the current system date and time. 
@@ -32,11 +38,14 @@ class BusTracker extends Controller
      * 
      * The time specified is the local time.
      * 
-     * @return void
+     * @return string the current system date and time
      */
     public function time()
     {
-        return $this->get('gettime');
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('gettime'));
+        // return the date and time string
+        return $request->{'bustime-response'}->tm;
     }
 
     /**
@@ -59,33 +68,41 @@ class BusTracker extends Controller
      *              to the second. Set to “m” to get time resolution to the minute.
      *              If omitted, defaults to “m”.
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
-    public function vehicles(array $vid = null, array $rt = null, $tmres = 'm')
+    public function vehicles(array $vid = [], array $rt = [], $tmres = 'm')
     {
+        // create an empty array to add the param key value pairs to
         $params = [];
-
-        if($vid) {
-            $params['rt'] = $rt;
+        // check if the $vid param is not empty
+        if(!empty($vid)) {
+            // add the comma separated list of vehicle ids
+            $params['vid'] = implode(',',$vid);
         }
-
-        if($rt) {
-            $params['rt'] = $rt;
+        // check if the  $rt param is not empty
+        if(!empty($rt)) {
+            // add the comma separated list of route ids
+            $params['rt'] = implode(',',$rt);
         }
-
+        // validate the time stamp resolution, and set the parameter to the result
         $params['tmres'] = TimeStampResolution::validate($tmres);
-
-        return $this->get('getvehicles', $params);
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getvehicles', $params));
+         // create a response and return
+        return $this->bustimeResponse($request, 'vehicle', self::ENTITIES_NAMESPACE . 'Vehicle');
     }
 
     /**
      * Use the getroutes request to retrieve the set of routes serviced by the system.
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
     public function routes()
     {
-        return $this->get('getroutes');
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getroutes'));
+        // create a response and return 
+        return $this->bustimeResponse($request, 'routes', self::ENTITIES_NAMESPACE . 'Route');
     }
 
     /**
@@ -94,15 +111,17 @@ class BusTracker extends Controller
      * 
      * @param string $rt Single route designator(required)
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
     public function routeDirections($rt)
     {
         $params = [
             'rt' => $rt
         ];
-
-        return $this->get('getdirections', $params);
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getdirections', $params));
+        // create a response and return 
+        return $this->bustimeResponse($request, 'directions', self::ENTITIES_NAMESPACE . 'RouteDirection');
     }
 
     /**
@@ -116,7 +135,7 @@ class BusTracker extends Controller
      * @param string $rt Single route designator(required)
      * @param string $dir Single route direction(required)
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
     public function stops($rt, $dir)
     {
@@ -125,7 +144,10 @@ class BusTracker extends Controller
             'dir' => $dir
         ];
 
-        return $this->get('getstops', $params);
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getstops', $params));
+        // create a response and return 
+        return $this->bustimeResponse($request, 'stops', self::ENTITIES_NAMESPACE . 'Stop');
     }
 
     /**
@@ -153,7 +175,7 @@ class BusTracker extends Controller
      * 
      * @throws Exception when more than 10 patterns have been specified.
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
     public function patterns(array $pid = null, $rt = null)
     {
@@ -176,7 +198,10 @@ class BusTracker extends Controller
             $params['rt'] = $rt;
         }
 
-        return $this->get('getpatterns', $params);
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getpatterns', $params));
+        // create a response and return 
+        return $this->bustimeResponse($request, 'ptr', self::ENTITIES_NAMESPACE . 'Pattern');
     }
 
     /**
@@ -208,7 +233,7 @@ class BusTracker extends Controller
      * 
      * @throws StopIdMissingException when no stop IDs have been provided.
      * 
-     * @return mixed results from the http request
+     * @return ArrayIterator results from the http request
      */
     public function predictions(array $stpid = null, array $rt = null, array $vid = [], $top = null)
     {
@@ -244,9 +269,10 @@ class BusTracker extends Controller
             // add the limit to the parameters
             $params['top'] = TopParameter::validate($top);
         }
-
-        // send the request
-        return $this->get('getpredictions', $params);
+        // make the request and decode the json in to an object
+        $request = json_decode($this->get('getpredictions', $params));
+        // create a response and return 
+        return $this->bustimeResponse($request, 'prd', self::ENTITIES_NAMESPACE . 'Prediction');
     }
 
     /**
@@ -260,5 +286,33 @@ class BusTracker extends Controller
     public function serviceBulletins()
     {
         throw new \Exception('Depricated, please use Customer Alerts API');
+    }
+
+    /**
+     * @param stdClass $request 
+     * @param string $key
+     * @param string $entityType
+     * 
+     * @throws Exception when entity provided by name does not exist.
+     * 
+     * @return ArrayIterator results from the http request
+     */
+    protected function bustimeResponse(\stdClass $request, string $key, string $entityType)
+    {
+        if (!class_exists($entityType)) {
+            throw new EntityUndefinedException;
+        }
+        // get the vehicles from the request object
+        $items = $request->{'bustime-response'}->{$key};
+        // create a new results object
+        $results = new Results();
+        // loop through the vehicles
+        foreach($items as $item) {
+            $entity = new $entityType($item);
+            // create a vehicle object and add to the results
+            $results->add($entity);
+        }
+        // return the ArrayIterator object
+        return $results->getIterator();
     }
 }

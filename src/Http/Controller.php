@@ -2,40 +2,39 @@
 
 namespace Mchljams\Chicagotransit\Http;
 
-use Mchljams\Chicagotransit\Http\Configuration;
 use Mchljams\Chicagotransit\Exceptions\ControllerBaseUriException;
-use Mchljams\Chicagotransit\Helpers\OutputTypeKey;
+use Mchljams\Chicagotransit\Exceptions\ControllerOutputTypeKeyException;
 use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\Psr7\Response;
 
 class Controller
 {
-    private $configuration;
+    private $apiKey;
 
     private $client;
 
     protected $baseUri = null;
 
-    public function __construct(Configuration $configuration, Client $client = null)
+    protected $outputTypeKey = null;
+
+    protected $outputType = 'json';
+
+    public function __construct($apiKey, Client $client = null)
     {
-        $this->configuration = $configuration;
+        $this->apiKey = $apiKey;
 
         $this->client = is_null($client) ?  new Client() : $client;
     }
 
     private function getRequestUri($path, $params = []) 
     {
+        // add the key to the params
+        $params['key'] = $this->apiKey;
 
-        // fetch the api key if one is required
-        $key = $this->getApiKey();
-        // check the the key exists
-        if($key) {
-            // add the key to the params
-            $params['key'] = $key;
-        }
-
-        $outputTypeKey = OutputTypeKey::get($this->getCallingClass());
+        $outputTypeKey = $this->getOutputTypeKey();
         
-        $params[$outputTypeKey] = $this->configuration->getOutputType();
+        $params[$outputTypeKey] = $this->outputType;
 
         $encodedParams = http_build_query($params);
 
@@ -52,24 +51,14 @@ class Controller
         return $this->baseUri;
     }
 
-    private function getApiKey()
+    private function getOutputTypeKey()
     {
-        // assemble the get key method
-        $keyMethod = 'get' . $this->getCallingClass() . 'ApiKey';
-        // check that the method exists on the config
-        if(method_exists($this->configuration, $keyMethod))
-        {
-            // fetch the key and return (call dynamically based on key method)
-            return $this->configuration->{$keyMethod}();
-        } 
-        // no key required
-        return false;
-    }
+        // the base uri must be set by the extending class
+        if(!isset($this->outputTypeKey)){
+            throw new ControllerOutputTypeKeyException;
+        }
 
-    private function getCallingClass() {
-        $reflect = new \ReflectionClass($this);
-
-        return $reflect->getShortName();
+        return $this->outputTypeKey;
     }
 
     protected function get($endpoint, $params = []) {

@@ -8,6 +8,8 @@ class TrainTracker extends Controller
 {
     protected $baseUri = 'http://lapi.transitchicago.com/api/1.0/';
 
+    protected $outputTypeKey = 'outputType';
+
     public function arrivals($mapId = null, $stopId = null, $max = null, $routeCode = null)
     {
         

@@ -5,13 +5,18 @@
     "require": {
         "guzzlehttp/guzzle": "^6.3"
     },
+    "require-dev": {
+        "fzaninotto/faker": "^1.8",
+        "phpunit/phpunit": "^8.4"
+    },
     "autoload": {
         "psr-4": {
             "Mchljams\\Chicagotransit\\": "src/"
         }
     },
-    "require-dev": {
-        "fzaninotto/faker": "^1.8",
-        "phpunit/phpunit": "^8.4"
+    "autoload-dev": {
+        "psr-4": {
+            "Mchljams\\Chicagotransit\\Tests\\": "tests/"
+        }
     }
 }
